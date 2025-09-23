@@ -1,4 +1,4 @@
-from app import db, login_manager, bcrypt
+from app import db, login_manager, bcrypt, app
 from flask_login import UserMixin
 
 # Esta função é necessária para o Flask-Login.
@@ -38,5 +38,42 @@ class User(db.Model, UserMixin):
 
     def __repr__(self):
         return f"User('{self.name}', '{self.email}', '{self.role}')"
+    
+
+# --- Criando o Comando para Adicionar Usuários ---
+
+import click
+
+@app.cli.command('create-user')
+@click.argument('name')
+@click.argument('email')
+@click.argument('password')
+@click.argument('role')
+def create_user_command(name, email, password, role):
+    """Cria um novo usuário com os dados fornecidos."""
+    
+    # Verifica se o e-mail já existe
+    if User.query.filter_by(email=email).first():
+        print(f"Erro: O e-mail '{email}' já está em uso.")
+        return
+
+    # Verifica se o papel (role) é válido
+    valid_roles = ['admin', 'sac1_sac2_add_edit', 'sac1_edit', 'sac2_edit', 'fat_edit', 'viewer']
+    if role not in valid_roles:
+        print(f"Erro: O papel '{role}' é inválido. Use um dos seguintes: {', '.join(valid_roles)}")
+        return
+
+    # Cria a instância do novo usuário
+    user = User(name=name, email=email, role=role)
+    # Define a senha (isso vai gerar o hash automaticamente)
+    user.password = password
+    
+    # Adiciona ao banco de dados
+    db.session.add(user)
+    db.session.commit()
+    
+    print(f"Usuário '{name}' criado com sucesso com o papel '{role}'.")
+
+
 
 
