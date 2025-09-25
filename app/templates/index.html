@@ -1,1 +1,17 @@
- 
+{% extends "base.html" %}
+
+{% block main_content %}  <!-- MUDANÇA AQUI -->
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Página Inicial</h2>
+        <!--<a href="{{ url_for('logout') }}" class="btn btn-primary">Sair</a> -->
+    </div>
+    <hr>
+
+    {% if current_user.is_authenticated %}
+        <h3>Olá, {{ current_user.name }}!</h3>
+        <p>Bem-vindo(a) ao Gerenciador de Devoluções.</p>
+        <p>Seu nível de acesso é: <strong>{{ current_user.role }}</strong>.</p>
+    {% endif %}
+
+    <p>Aqui será a página principal da aplicação, onde listaremos as devoluções cadastradas.</p>
+{% endblock %}
