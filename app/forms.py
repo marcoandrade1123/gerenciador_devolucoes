@@ -19,7 +19,7 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Entrar')
 
 # --- NOVO FORMULÁRIO DE EDIÇÃO DE USUÁRIO ---
-class EditUserForm(object):
+class EditUserForm(FlaskForm):
     """
     Formulário para um administrador editar os dados de um usuário.
     """

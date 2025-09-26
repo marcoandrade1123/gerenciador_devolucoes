@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block main_content %}
+    <h1>{{ title }}</h1>
+    <hr>
+
+    <!-- O 'novalidate' desativa a validação padrão do navegador, 
+         permitindo que nossas validações do Flask (WTForms) funcionem. -->
+    <form method="POST" action="" novalidate>
+        
+        <!-- Campo oculto de proteção CSRF. Essencial para segurança. -->
+        {{ form.hidden_tag() }}
+
+        <div class="mb-3">
+            {{ form.name.label(class="form-label") }}
+            {{ form.name(class="form-control") }}
+            {% for error in form.name.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            {{ form.email.label(class="form-label") }}
+            {{ form.email(class="form-control") }}
+            {% for error in form.email.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            {{ form.role.label(class="form-label") }}
+            {{ form.role(class="form-select") }} <!-- Usamos form-select para dropdowns -->
+            {% for error in form.role.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            {{ form.is_active.label(class="form-label") }}
+            {{ form.is_active(class="form-select") }} <!-- Usamos form-select para dropdowns -->
+            {% for error in form.is_active.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <hr>
+
+        <div class="mb-3">
+            {{ form.submit(class="btn btn-primary") }}
+            <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Cancelar</a>
+        </div>
+
+    </form>
+{% endblock %}

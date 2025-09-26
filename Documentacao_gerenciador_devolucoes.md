@@ -868,3 +868,74 @@ class EditUserForm(object):
             if user:
                 raise ValidationError('Este e-mail já está em uso por outro usuário.')
 ```
+Agora que temos o ***EditUserForm*** (***forms.py***) definido e salvo no Git, vamos usá-lo para construir a rota que vai orquestrar toda a lógica de edição.<br>
+Este é o passo mais complexo, pois a mesma função/rota terá duas responsabilidades:<br>
+Quando acessada via ***GET***: Carregar o usuário do banco, preencher o formulário com seus dados atuais e exibir a página.<br>
+Quando acessada via ***POST*** (após o admin clicar em "Salvar"): Validar os dados enviados, atualizar o usuário no banco e redirecionar.<br>
+### Passo 2: Criar a Rota edit_user
+Abra o arquivo ***app/routes.py*** e adicione o seguinte bloco de código no final.<br>
+***app/routes.py*** (Adicionar no final)
+```
+# ... (importações no topo)
+# Adicione a importação do novo formulário
+from app.forms import LoginForm, EditUserForm
+
+# ... (outras rotas como login, logout, admin_users, etc.) ...
+
+
+# --- NOVA ROTA DE EDIÇÃO DE USUÁRIO ---
+@app.route('/admin/user/<int:user_id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_user(user_id):
+    # Busca o usuário no banco de dados pelo ID fornecido na URL.
+    # O .first_or_404() é um atalho útil: se não encontrar o usuário, ele
+    # automaticamente retorna uma página de erro 404 (Not Found).
+    user = User.query.get_or_404(user_id)
+    
+    # Instancia o formulário, passando o e-mail original do usuário
+    # para a lógica de validação personalizada que criamos.
+    form = EditUserForm(original_email=user.email)
+
+    # --- LÓGICA PARA QUANDO O FORMULÁRIO É ENVIADO (MÉTODO POST) ---
+    if form.validate_on_submit():
+        # Atualiza os dados do objeto 'user' com os dados que vieram do formulário
+        user.name = form.name.data
+        user.email = form.email.data
+        user.role = form.role.data
+        user.is_active = form.is_active.data
+        
+        # "Comita" a sessão para salvar as alterações no banco de dados
+        db.session.commit()
+        
+        # Exibe uma mensagem de sucesso para o administrador
+        flash('Usuário atualizado com sucesso!', 'success')
+        
+        # Redireciona de volta para a página de listagem de usuários
+        return redirect(url_for('admin_users'))
+
+    # --- LÓGICA PARA QUANDO A PÁGINA É CARREGADA PELA PRIMEIRA VEZ (MÉTODO GET) ---
+    # Preenche o formulário com os dados atuais do usuário que veio do banco
+    form.name.data = user.name
+    form.email.data = user.email
+    form.role.data = user.role
+    form.is_active.data = user.is_active
+    
+    # Renderiza o template de edição, passando o formulário preenchido
+    return render_template('edit_user.html', title=f'Editar Usuário: {user.name}', form=form, user=user)
+```
+### Passo 3: Criar o Template edit_user.html
+Crie um novo arquivo chamado ***edit_user.html*** dentro da pasta app/templates/.<br>
+***app/templates/edit_users.html*** (Novo Arquivo)
+#### Passo 4: Ajustar o Link do Botão "Editar"
+Precisamos ir à nossa página de listagem de usuários e fazer com que o botão "Editar" de cada linha aponte para a URL correta, passando o ID daquele usuário específico.<br>
+Abra o arquivo ***app/templates/admin_users.html*** e encontre a linha do botão ***"Editar"***.<br>
+***app/templates/admin_users.html*** (Linha para alterar)
+```
+<!-- Encontre esta linha -->
+<a href="#" class="btn btn-sm btn-primary">Editar</a>
+
+<!-- E altere para esta -->
+<a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-sm btn-primary">Editar</a>
+
+```
