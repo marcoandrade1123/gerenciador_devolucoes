@@ -3,6 +3,7 @@ from flask_login import login_user, logout_user, current_user, login_required
 from app import app, db
 from app.forms import LoginForm
 from app.models import User
+from functools import wraps
 
 # ROTA DA PÁGINA INICIAL (FALTANDO)
 @app.route('/')
@@ -33,3 +34,23 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
+# --- DECORATOR DE PERMISSÃO DE ADMIN ---
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != 'admin':
+            flash('Acesso negado. Esta área é restrita a administradores.', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+# --- NOVA ROTA DE GERENCIAMENTO DE USUÁRIOS ---
+@app.route('/admin/users')
+@login_required
+@admin_required
+def admin_users():
+    # Busca todos os usuários no banco de dados, ordenados pelo nome
+    users = User.query.order_by(User.name).all()
+    return render_template('admin_users.html', title='Gerenciamento de Usuários', users=users)
