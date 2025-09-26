@@ -380,7 +380,7 @@ O sistema já sabe quais campos existem, quais são obrigatórios e como validá
 Este arquivo usará a estrutura do formulário que criamos em Python para renderizar os campos de E-mail, Senha e o botão de Entrar.
 
 ---
-## <span style="color: yellow;">2. Segunda parte (Criação de: routes.py, layout.html, base.html, login.html e index.html) 
+## <span style="color: yellow;">2. Segunda parte (Criação de: routes.py, layout.html, base.html) 
 ### Análise da Estratégia<br>
 A abordagem adotada foi criar uma hierarquia de templates de três níveis:<br>
 1. ***layout.html***: Um template "avô", super básico.<br>
@@ -689,4 +689,182 @@ main {
     margin-bottom: 0;
     margin-left: 0.5rem;
 }
+```
+---
+## <span style="color: yellow;">3. Terceira parte (routes.py, base.html, admin_users.html)
+Alteração em ***routes.py*** adicionando nova rota para, ao clicar no menu "Configurações > Usuários",<br>
+carregue a página "admin_users.html"<br>
+### Passo 1: Criar a Rota e a Lógica de Acesso
+Primeiro, criamos a rota em ***routes.py***.<br>
+Esta rota precisa ser protegida para que apenas administradores possam acessá-la e deve buscar todos os usuários no banco de dados para passá-los a um template: ***admin_users.html***<br>
+***app/routes.py***
+```
+# ... (outras importações no topo)
+from functools import wraps
+
+# --- DECORATOR DE PERMISSÃO DE ADMIN ---
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != 'admin':
+            flash('Acesso negado. Esta área é restrita a administradores.', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+# --- NOVA ROTA DE GERENCIAMENTO DE USUÁRIOS ---
+@app.route('/admin/users')
+@login_required
+@admin_required
+def admin_users():
+    # Busca todos os usuários no banco de dados, ordenados pelo nome
+    users = User.query.order_by(User.name).all()
+    return render_template('admin_users.html', title='Gerenciamento de Usuários', users=users)
+
+```
+### Passo 2: Criar o Link no Menu de Navegação
+Tornamos o link "Usuários" no menu funcional, apontando para a nova rota.<br>
+***app/templates/base.html*** (Linha alterada)
+```
+<!-- O código original era: -->
+<!-- <li><a class="dropdown-item" href="#">Usuários</a></li> -->
+
+<!-- O código foi alterado para: -->
+<li><a class="dropdown-item" href="{{ url_for('admin_users') }}">Usuários</a></li>
+```
+### Passo 3: Criar o Template da Página de Listagem
+Criamos a página HTML que exibe a tabela de usuários.<br>
+***app/templates/admin_users.html*** (Novo Arquivo)
+```
+{% extends "base.html" %}
+
+{% block main_content %}
+    <h1>{{ title }}</h1>
+    <p>Aqui você pode visualizar todos os usuários cadastrados no sistema.</p>
+
+    <table class="table table-hover mt-4">
+        <thead class="table-dark">
+            <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Nome</th>
+                <th scope="col">E-mail</th>
+                <th scope="col">Permissão (Role)</th>
+                <th scope="col">Status</th>
+                <th scope="col">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <th scope="row">{{ user.id }}</th>
+                <td>{{ user.name }}</td>
+                <td>{{ user.email }}</td>
+                <td>
+                    <span class="badge 
+                        {% if user.role == 'admin' %}bg-danger
+                        {% elif 'add' in user.role %}bg-success
+                        {% elif 'edit' in user.role %}bg-warning text-dark
+                        {% else %}bg-secondary
+                        {% endif %}">
+                        {{ user.role }}
+                    </span>
+                </td>
+                <td>
+                    {% if user.is_active %}
+                        <span class="badge bg-success">Ativo</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Inativo</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="#" class="btn btn-sm btn-primary">Editar</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
+```
+###Resumo:###
+Arquivos que criamos/modificamos:<br>
+* ***app/routes.py*** (adicionamos o decorator admin_required e a rota admin_users)
+* ***app/templates/base.html*** (atualizamos o link do menu)
+* ***app/templates/admin_users.html*** (criamos o novo template da página)
+### Atualizar GitHub ###
+Comandos via terminal:<br>
+```
+git add .
+git commit -m "Feat: Adiciona pagina de listagem de usuarios para admin"
+git push origin main
+```
+---
+## <span style="color: yellow;">4. Quarta parte (edit_users.html)
+Criar página para Edição de usuários.<br>
+Para criar a página de edição de usuário, vamos seguir um padrão muito parecido com o que fizemos para a página de login.<br>
+O fluxo será:<br>
+* O admin clica no botão "Editar" de um usuário específico (ex: usuário com ID 5).
+* O navegador o leva para uma URL como /admin/user/5/edit.
+* O Flask carrega os dados do usuário 5 do banco.
+* O Flask renderiza um formulário pré-preenchido com os dados desse usuário.
+* O admin altera os dados e clica em "Salvar".
+* O Flask valida os dados, atualiza o usuário no banco e redireciona o admin de volta para a lista de usuários com uma mensagem de sucesso.<br>
+Para fazer tudo isso acontecer, vamos precisar mexer nos seguintes arquivos:<br>
+
+| Arquivo | Ação | Popósito |
+|---|:---:|---:|
+| app/forms.py | Criar (nova classe) | Definiremos uma nova classe, EditUserForm, <br> que conterá os campos do formulário de edição (Nome, E-mail, Role, Status). |
+| app/routes.py | Criar (nova rota) | Criaremos a rota /admin/user/<int:user_id>/edit <br> que vai lidar com a lógica de carregar, exibir e salvar o usuário. |
+| app/templates/edit_user.html | Criar (novo arquivo) | Este será o novo arquivo HTML que conterá o formulário de edição, herdando do nosso base.html. |
+| app/templates/admin_users.html | Alterar | Vamos modificar o link do botão "Editar" para que ele aponte para a URL correta, passando o ID do usuário. |
+
+### Passo 1: Criar o Formulário de Edição (EditUserForm)
+Este formulário definirá os campos que o administrador poderá editar.<br> 
+Será um pouco diferente do LoginForm, pois teremos mais campos e um campo de "seleção" (dropdown) para o role.<br>
+Abra o arquivo app/forms.py e adicione a nova classe no final do arquivo.<br>
+***app/forms.py*** (Adicionar no final)
+```
+# ... (importações no topo, como StringField, PasswordField, etc.)
+# Adicione a importação do SelectField
+from wtforms import StringField, SubmitField, SelectField
+from wtforms.validators import DataRequired, Length, Email, ValidationError
+from app.models import User # Precisamos do modelo User para validar o e-mail
+
+# ... (classe LoginForm existente) ...
+
+
+# --- NOVO FORMULÁRIO DE EDIÇÃO DE USUÁRIO ---
+class EditUserForm(object):
+    """
+    Formulário para um administrador editar os dados de um usuário.
+    """
+    name = StringField('Nome Completo', validators=[DataRequired(), Length(min=2, max=100)])
+    email = StringField('E-mail', validators=[DataRequired(), Email()])
+    role = SelectField('Permissão (Role)', choices=[
+        ('admin', 'Administrador'),
+        ('sac1_sac2_add_edit', 'SAC 1 & 2 (Add/Edit)'),
+        ('sac1_edit', 'SAC 1 (Edit)'),
+        ('sac2_edit', 'SAC 2 (Edit)'),
+        ('fat_edit', 'Faturamento (Edit)'),
+        ('viewer', 'Visualizador')
+    ], validators=[DataRequired()])
+    is_active = SelectField('Status', choices=[
+        (True, 'Ativo'),
+        (False, 'Inativo')
+    ], coerce=bool, validators=[DataRequired()]) # coerce=bool é importante para converter o valor
+    
+    submit = SubmitField('Salvar Alterações')
+
+    def __init__(self, original_email, *args, **kwargs):
+        super(EditUserForm, self).__init__(*args, **kwargs)
+        self.original_email = original_email
+
+    def validate_email(self, email):
+        """
+        Valida se o novo e-mail já não está em uso por OUTRO usuário.
+        """
+        if email.data != self.original_email:
+            user = User.query.filter_by(email=email.data).first()
+            if user:
+                raise ValidationError('Este e-mail já está em uso por outro usuário.')
 ```
