@@ -1133,3 +1133,180 @@ Ele deve estar parecido com isto:
 * **href="{{ url_for('add_user') }}": ** O primeiro item do menu agora aponta para a nossa nova rota add_user, que exibe o formulário em branco.<br>
 * **href="{{ url_for('admin_users') }}": ** O segundo item aponta para a rota admin_users, que é a nossa página de listagem, de onde podemos iniciar a edição.<br>
 * Texto dos Links: Alteramos o texto para "Adicionar Usuário" e "Editar Usuários", que são ações muito mais explícitas e claras para o administrador.
+## <span style="color: yellow;">6. Sexta parte (Reset de Senha pelo admin)
+***O Sistema Gera uma Senha Aleatória:*** Adicionar um simples botão "Resetar Senha".<br>
+Ao clicar, o sistema gera uma senha forte e aleatória, salva no banco e a exibe na tela para o admin (apenas uma vez).<br>
+O admin então copia essa senha e a informa ao usuário por um canal seguro.<br>
+***Planejamento:*** Arquivos Envolvidos
+Para adicionar um botão que dispara uma ação específica (como o reset de senha), o fluxo é um pouco diferente.<br>
+Não precisamos de um novo formulário completo, mas sim de uma nova rota que realiza a ação e depois redireciona.
+
+| Arquivo | Ação | Popósito |
+|---|:---:|---:|
+| app/forms.py | Criar (nova rota) | Criaremos a rota /admin/user/<int:user_id>/reset-password. Esta rota será acessada<br> via POST e conterá a lógica para gerar a nova senha, salvar no banco e exibir a mensagem. |
+| app/templates/edit_user.html | Alterar | Adicionaremos um pequeno formulário com o botão "Resetar Senha" nesta página.<br> O formulário é necessário para que possamos fazer uma requisição POST de forma segura. |
+
+### Passo 1: Criar a Rota reset_password
+Esta rota não vai renderizar uma nova página.<br> Sua única função é fazer algo e depois redirecionar.<br>
+Abra o arquivo ***app/routes.py*** e adicione este código no final.<br>
+***app/routes.py*** (Adicionar no final)
+
+```
+# ... (importações no topo)
+# Adicione as importações 'secrets' e 'string' para gerar a senha
+import secrets
+import string
+
+# ... (outras rotas) ...
+
+
+# --- NOVA ROTA DE RESET DE SENHA ---
+@app.route('/admin/user/<int:user_id>/reset-password', methods=['POST'])
+@login_required
+@admin_required
+def reset_password(user_id):
+    # Busca o usuário ou retorna erro 404
+    user = User.query.get_or_404(user_id)
+    
+    # Gera uma senha aleatória e segura
+    alphabet = string.ascii_letters + string.digits + string.punctuation
+    new_password = ''.join(secrets.choice(alphabet) for i in range(12)) # Senha de 12 caracteres
+
+    # Define a nova senha para o usuário (isso vai gerar o hash)
+    user.set_password(new_password)
+    
+    # Salva a alteração no banco de dados
+    db.session.commit()
+    
+    # Prepara uma mensagem flash especial que contém a nova senha
+    # Usamos a formatação f-string para incluir a senha na mensagem.
+    # O 'warning' (amarelo) chama mais atenção para a informação crítica.
+    flash(f'Senha do usuário "{user.name}" resetada com sucesso! A nova senha é: {new_password}', 'warning')
+    
+    # Redireciona de volta para a página de edição do mesmo usuário
+    return redirect(url_for('edit_user', user_id=user.id))
+```
+***Análise Detalhada do Código:***
+* ***import secrets e import string:*** Importamos duas bibliotecas nativas do Python.<br> string nos dá acesso a listas de caracteres (letras, dígitos, pontuação) e secrets é a forma mais segura de gerar números e escolhas aleatórias em Python, ideal para senhas e tokens.
+* ***methods=['POST']:*** Crucial! Esta rota só pode ser acessada via POST.<br> Isso impede que alguém acesse a URL /admin/user/5/reset-password diretamente pelo navegador e resete a senha sem querer.<br> A ação só pode ser disparada por um formulário.
+* ***Geração da Senha:*** A lógica cria uma senha de 12 caracteres misturando letras, números e símbolos.<br> É uma senha bem forte.
+* ***user.set_password(new_password):*** Usamos nosso método já existente para salvar o hash da nova senha.
+* ***flash(..., 'warning'):*** Aqui está o pulo do gato.<br> Exibimos a nova senha para o admin através de uma mensagem flash.<br> Usamos a categoria warning (que o Bootstrap mostra como amarela) para destacar que esta é uma informação importante e temporária.
+* ***redirect(url_for('edit_user', ...)):*** Após resetar, redirecionamos o admin de volta para a página de edição daquele mesmo usuário, onde ele verá a mensagem com a nova senha.
+### Passo 2: Adicionar o Botão/Formulário de Reset
+Abra o arquivo ***app/templates/edit_user.html***.
+Nós vamos adicionar um novo formulário, separado do formulário principal de edição.<br> Um bom lugar para ele é ao lado do botão "Salvar Alterações", ou logo abaixo dele.<br> Vamos colocá-lo ao lado, usando um pouco de Flexbox do Bootstrap para alinhar.<br>
+Encontre o final do formulário de edição, onde estão os botões "Salvar Alterações" e "Cancelar".<br>
+***app/templates/edit_user.html*** (Trecho para encontrar)
+```
+        <hr>
+
+        <div class="mb-3">
+            {{ form.submit(class="btn btn-primary") }}
+            <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Cancelar</a>
+        </div>
+
+    </form>
+```
+Agora, vamos substituir esse bloco div por um novo, mais inteligente, que conterá os dois formulários (o de salvar e o de resetar).<br>
+***app/templates/edit_user.html*** (Substituir pelo código completo)
+```
+{% extends "base.html" %}
+
+{% block main_content %}
+    <h1>{{ title }}</h1>
+    <hr>
+
+    <!-- Formulário Principal para Editar os Dados do Usuário -->
+    <form method="POST" action="" novalidate id="edit-form">
+        
+        {{ form.hidden_tag() }}
+
+        <!-- Campos do formulário (name, email, role, is_active) -->
+        <div class="mb-3">
+            {{ form.name.label(class="form-label") }}
+            {{ form.name(class="form-control") }}
+            {% for error in form.name.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            {{ form.email.label(class="form-label") }}
+            {{ form.email(class="form-control") }}
+            {% for error in form.email.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            {{ form.role.label(class="form-label") }}
+            {{ form.role(class="form-select") }}
+            {% for error in form.role.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            {{ form.is_active.label(class="form-label") }}
+            {{ form.is_active(class="form-select") }}
+            {% for error in form.is_active.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+    </form> <!-- FIM DO FORMULÁRIO PRINCIPAL -->
+
+    <hr>
+
+    <!-- Container para os botões de ação, AGORA FORA do formulário principal -->
+    <div class="d-flex justify-content-between align-items-center">
+        
+        <!-- Botões relacionados ao formulário de edição -->
+        <div>
+            <!-- Este botão agora usa o atributo 'form' para se associar ao formulário pelo ID -->
+            <button type="submit" class="btn btn-primary" form="edit-form">Salvar Alterações</button>
+            <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Cancelar</a>
+        </div>
+
+        <!-- Formulário e Botão para Resetar a Senha (agora independente) -->
+        <div>
+            <form method="POST" action="{{ url_for('reset_password', user_id=user.id) }}" 
+                  onsubmit="return confirm('Você tem certeza que deseja resetar a senha deste usuário? Esta ação não pode ser desfeita.');">
+                <button type="submit" class="btn btn-warning">Resetar Senha</button>
+            </form>
+        </div>
+
+    </div>
+{% endblock %}
+       
+```
+***Análise Detalhada do Código Novo:***
+
+\<div class="d-flex justify-content-between align-items-center">: Este é um container Flexbox do Bootstrap.
+
+> 1. ***d-flex:*** Ativa o layout flexível.
+> 2. ***justify-content-between:*** Coloca o máximo de espaço possível entre os itens filhos, empurrando um para a esquerda e outro para a direita.
+> 3. ***align-items-center:*** Alinha os itens verticalmente no centro.
+Formulário de Reset:
+
+***Formulário de Reset:***
+
+\<form method="POST" action="{{ url_for('reset_password', user_id=user.id) }}">: Criamos um novo formulário minúsculo.
+
+> 1. method="POST": Essencial para acionar nossa rota, que só aceita POST.
+> 2. action="...": Aponta diretamente para a nossa nova rota reset_password, passando o user.id do usuário que estamos editando.
+> 3. onsubmit="...": Este é um atributo JavaScript que adiciona uma camada extra de segurança e usabilidade.
+> 4. return confirm(...): Exibe uma caixa de diálogo de confirmação no navegador.
+> * Se o admin clicar em "OK", a função confirm retorna true e o formulário é enviado.
+> * Se ele clicar em "Cancelar", a função retorna false e o envio do formulário é cancelado.<br> Isso evita resets de senha acidentais.
+
+\<button type="submit" class="btn btn-warning">: O botão que, ao ser clicado, envia este pequeno formulário.<br> Usamos a classe btn-warning (amarelo) para indicar uma ação que requer atenção.
+
+***Análise da Correção:***
+
+\</form> Adiantado: O formulário principal agora fecha (\</form>) antes da linha e do container dos botões.
+
+> 1. id="edit-form": Eu dei um id único ao formulário principal.
+> 2. <button type="submit" ... form="edit-form">: O botão "Salvar Alterações" agora está fora do seu formulário.<br> Para que ele saiba qual formulário enviar, usamos o atributo form="edit-form", que o vincula ao formulário pelo id.<br> Este é o HTML moderno e correto para este tipo de situação.
+> 3. Formulários Irmãos: Agora, o \<form id="edit-form"> e o \<form action="{{ url_for('reset_password', ... ) }}"> são independentes e não estão um dentro do outro.<br>
+Com esta estrutura, o navegador não terá mais dúvidas.<vr> Clicar em "Salvar Alterações" enviará o formulário edit-form para a rota edit_user.<br> Clicar em "Resetar Senha" enviará o outro formulário para a rota reset_password.

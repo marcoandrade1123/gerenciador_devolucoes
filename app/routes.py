@@ -4,6 +4,8 @@ from app import app, db
 from app.forms import LoginForm, EditUserForm, AddUserForm
 from app.models import User
 from functools import wraps
+import secrets # módulo da biblioteca padrão do Python.
+import string  # módulo da biblioteca padrão do Python.
 
 # ROTA DA PÁGINA INICIAL (FALTANDO)
 @app.route('/')
@@ -138,3 +140,28 @@ def add_user():
     # Apenas renderiza o template com o formulário em branco
     return render_template('add_user.html', title='Adicionar Novo Usuário', form=form)
 
+# --- NOVA ROTA DE RESET DE SENHA ---
+@app.route('/admin/user/<int:user_id>/reset-password', methods=['POST'])
+@login_required
+@admin_required
+def reset_password(user_id):
+    # Busca o usuário ou retorna erro 404
+    user = User.query.get_or_404(user_id)
+    
+    # Gera uma senha aleatória e segura
+    alphabet = string.ascii_letters + string.digits + string.punctuation
+    new_password = ''.join(secrets.choice(alphabet) for i in range(12)) # Senha de 12 caracteres
+
+    # Define a nova senha para o usuário (isso vai gerar o hash)
+    user.set_password(new_password)
+    
+    # Salva a alteração no banco de dados
+    db.session.commit()
+    
+    # Prepara uma mensagem flash especial que contém a nova senha
+    # Usamos a formatação f-string para incluir a senha na mensagem.
+    # O 'warning' (amarelo) chama mais atenção para a informação crítica.
+    flash(f'Senha do usuário "{user.name}" resetada com sucesso! A nova senha é: {new_password}', 'warning')
+    
+    # Redireciona de volta para a página de edição do mesmo usuário
+    return redirect(url_for('edit_user', user_id=user.id))

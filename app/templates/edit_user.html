@@ -4,13 +4,12 @@
     <h1>{{ title }}</h1>
     <hr>
 
-    <!-- O 'novalidate' desativa a validação padrão do navegador, 
-         permitindo que nossas validações do Flask (WTForms) funcionem. -->
-    <form method="POST" action="" novalidate>
+    <!-- Formulário Principal para Editar os Dados do Usuário -->
+    <form method="POST" action="" novalidate id="edit-form">
         
-        <!-- Campo oculto de proteção CSRF. Essencial para segurança. -->
         {{ form.hidden_tag() }}
 
+        <!-- Campos do formulário (name, email, role, is_active) -->
         <div class="mb-3">
             {{ form.name.label(class="form-label") }}
             {{ form.name(class="form-control") }}
@@ -29,7 +28,7 @@
 
         <div class="mb-3">
             {{ form.role.label(class="form-label") }}
-            {{ form.role(class="form-select") }} <!-- Usamos form-select para dropdowns -->
+            {{ form.role(class="form-select") }}
             {% for error in form.role.errors %}
                 <div class="invalid-feedback d-block">{{ error }}</div>
             {% endfor %}
@@ -37,18 +36,32 @@
 
         <div class="mb-3">
             {{ form.is_active.label(class="form-label") }}
-            {{ form.is_active(class="form-select") }} <!-- Usamos form-select para dropdowns -->
+            {{ form.is_active(class="form-select") }}
             {% for error in form.is_active.errors %}
                 <div class="invalid-feedback d-block">{{ error }}</div>
             {% endfor %}
         </div>
+    </form> <!-- FIM DO FORMULÁRIO PRINCIPAL -->
 
-        <hr>
+    <hr>
 
-        <div class="mb-3">
-            {{ form.submit(class="btn btn-primary") }}
+    <!-- Container para os botões de ação, AGORA FORA do formulário principal -->
+    <div class="d-flex justify-content-between align-items-center">
+        
+        <!-- Botões relacionados ao formulário de edição -->
+        <div>
+            <!-- Este botão agora usa o atributo 'form' para se associar ao formulário pelo ID -->
+            <button type="submit" class="btn btn-primary" form="edit-form">Salvar Alterações</button>
             <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Cancelar</a>
         </div>
 
-    </form>
+        <!-- Formulário e Botão para Resetar a Senha (agora independente) -->
+        <div>
+            <form method="POST" action="{{ url_for('reset_password', user_id=user.id) }}" 
+                  onsubmit="return confirm('Você tem certeza que deseja resetar a senha deste usuário? Esta ação não pode ser desfeita.');">
+                <button type="submit" class="btn btn-warning">Resetar Senha</button>
+            </form>
+        </div>
+
+    </div>
 {% endblock %}
