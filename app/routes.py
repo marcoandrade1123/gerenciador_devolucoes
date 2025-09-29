@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, flash
 from flask_login import login_user, logout_user, current_user, login_required
 from app import app, db
-from app.forms import LoginForm, EditUserForm
+from app.forms import LoginForm, EditUserForm, AddUserForm
 from app.models import User
 from functools import wraps
 
@@ -95,3 +95,46 @@ def edit_user(user_id):
     
     # Renderiza o template de edição, passando o formulário preenchido
     return render_template('edit_user.html', title=f'Editar Usuário: {user.name}', form=form, user=user)
+
+# ... (importações no topo)
+# Certifique-se de que AddUserForm está na lista de importações do app.forms
+from app.forms import LoginForm, EditUserForm, AddUserForm
+
+# ... (outras rotas como login, logout, admin_users, edit_user) ...
+
+
+# --- NOVA ROTA DE ADIÇÃO DE USUÁRIO ---
+@app.route('/admin/user/add', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def add_user():
+    # Instancia o formulário de adição
+    form = AddUserForm()
+
+    # --- LÓGICA PARA QUANDO O FORMULÁRIO É ENVIADO (MÉTODO POST) ---
+    if form.validate_on_submit():
+        # Cria uma nova instância do objeto User com os dados do formulário
+        new_user = User(
+            name=form.name.data,
+            email=form.email.data,
+            role=form.role.data,
+            is_active=form.is_active.data
+        )
+        # Usa o nosso método set_password para gerar o hash da senha
+        new_user.set_password(form.password.data)
+        
+        # Adiciona o novo usuário à sessão do banco de dados
+        db.session.add(new_user)
+        # "Comita" a sessão para salvar o novo usuário permanentemente
+        db.session.commit()
+        
+        # Exibe uma mensagem de sucesso
+        flash(f'Usuário "{form.name.data}" criado com sucesso!', 'success')
+        
+        # Redireciona para a página de listagem de usuários
+        return redirect(url_for('admin_users'))
+
+    # --- LÓGICA PARA QUANDO A PÁGINA É CARREGADA (MÉTODO GET) ---
+    # Apenas renderiza o template com o formulário em branco
+    return render_template('add_user.html', title='Adicionar Novo Usuário', form=form)
+

@@ -939,3 +939,197 @@ Abra o arquivo ***app/templates/admin_users.html*** e encontre a linha do botão
 <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-sm btn-primary">Editar</a>
 
 ```
+## <span style="color: yellow;">5. Quinta parte (add_user.html - Adicionar Usuário)
+O fluxo para ***"Adicionar Usuário"*** será muito, muito parecido com o de "Editar Usuário". <br>
+A principal diferença é que começaremos com um formulário em branco em vez de um pré-preenchido.
+
+| Arquivo | Ação | Popósito |
+|---|:---:|---:|
+| app/forms.py | Criar (nova classe) | Criaremos um AddUserForm, que será quase idêntico ao EditUserForm, <br> mas com uma validação de e-mail mais simples (apenas verifica se já existe) e um campo de senha. |
+| app/routes.py | Criar (nova rota) | Criaremos a rota /admin/user/add <br> que exibirá o formulário em branco e processará a criação do novo usuário. |
+| app/templates/add_user.html | Criar (novo arquivo) | Este será o template HTML para a página de adição. <br> Ele será praticamente uma cópia do edit_user.html. |
+| app/templates/base.html | Alterar | Modificaremos o menu "Gerenciamento" para refletir sua sugestão: <br> um link para "Editar Usuário" e um novo link para "Adicionar Usuário". |
+
+### Passo 1: Criar o Formulário de Adição (AddUserForm)
+Este formulário precisa de todos os campos do EditUserForm, mais um campo para a senha.<br>
+Abra o arquivo ***app/forms.py*** e adicione esta nova classe no final.<br>
+***app/forms.py*** (Adicionar no final)
+```
+# --- NOVO FORMULÁRIO DE ADIÇÃO DE USUÁRIO ---
+class AddUserForm(FlaskForm):
+    """
+    Formulário para um administrador adicionar um novo usuário ao sistema.
+    """
+    name = StringField('Nome Completo', validators=[DataRequired(), Length(min=2, max=100)])
+    email = StringField('E-mail', validators=[DataRequired(), Email()])
+    password = PasswordField('Senha', validators=[DataRequired(), Length(min=8)])
+    role = SelectField('Permissão (Role)', choices=[
+        ('admin', 'Administrador'),
+        ('sac1_sac2_add_edit', 'SAC 1 & 2 (Add/Edit)'),
+        ('sac1_edit', 'SAC 1 (Edit)'),
+        ('sac2_edit', 'SAC 2 (Edit)'),
+        ('fat_edit', 'Faturamento (Edit)'),
+        ('viewer', 'Visualizador')
+    ], validators=[DataRequired()])
+    is_active = SelectField('Status', choices=[
+        (True, 'Ativo'),
+        (False, 'Inativo')
+    ], coerce=bool, validators=[DataRequired()])
+    
+    submit = SubmitField('Adicionar Usuário')
+
+    def validate_email(self, email):
+        """
+        Valida se o e-mail fornecido já não está em uso.
+        """
+        user = User.query.filter_by(email=email.data).first()
+        if user:
+            raise ValidationError('Este e-mail já está cadastrado. Por favor, utilize outro.')
+```
+### Passo 2: Criar nova rota add_user
+Abra o arquivo ***app/routes.py*** e adicione o seguinte bloco de código no final.<br>
+***app/routes.py*** (Adicionar no final do arquivo)
+```
+# --- NOVA ROTA DE ADIÇÃO DE USUÁRIO ---
+@app.route('/admin/user/add', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def add_user():
+    # Instancia o formulário de adição
+    form = AddUserForm()
+
+    # --- LÓGICA PARA QUANDO O FORMULÁRIO É ENVIADO (MÉTODO POST) ---
+    if form.validate_on_submit():
+        # Cria uma nova instância do objeto User com os dados do formulário
+        new_user = User(
+            name=form.name.data,
+            email=form.email.data,
+            role=form.role.data,
+            is_active=form.is_active.data
+        )
+        # Usa o nosso método set_password para gerar o hash da senha
+        new_user.set_password(form.password.data)
+        
+        # Adiciona o novo usuário à sessão do banco de dados
+        db.session.add(new_user)
+        # "Comita" a sessão para salvar o novo usuário permanentemente
+        db.session.commit()
+        
+        # Exibe uma mensagem de sucesso
+        flash(f'Usuário "{form.name.data}" criado com sucesso!', 'success')
+        
+        # Redireciona para a página de listagem de usuários
+        return redirect(url_for('admin_users'))
+
+    # --- LÓGICA PARA QUANDO A PÁGINA É CARREGADA (MÉTODO GET) ---
+    # Apenas renderiza o template com o formulário em branco
+    return render_template('add_user.html', title='Adicionar Novo Usuário', form=form)
+```
+### Passo 3: Criar o Template add_user.html
+Crie um novo arquivo chamado ***add_user.html*** dentro da sua pasta ***app/templates/***.
+***app/templates/add_user.html*** (Novo Arquivo)
+```
+{% extends "base.html" %}
+
+{% block main_content %}
+    <h1>{{ title }}</h1>
+    <hr>
+
+    <!-- O 'novalidate' desativa a validação padrão do navegador, 
+         permitindo que nossas validações do Flask (WTForms) funcionem. -->
+    <form method="POST" action="" novalidate>
+        
+        <!-- Campo oculto de proteção CSRF. Essencial para segurança. -->
+        {{ form.hidden_tag() }}
+
+        <div class="mb-3">
+            {{ form.name.label(class="form-label") }}
+            {{ form.name(class="form-control") }}
+            {% for error in form.name.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            {{ form.email.label(class="form-label") }}
+            {{ form.email(class="form-control") }}
+            {% for error in form.email.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <!-- CAMPO DE SENHA (A principal diferença em relação à edição) -->
+        <div class="mb-3">
+            {{ form.password.label(class="form-label") }}
+            {{ form.password(class="form-control") }}
+            {% for error in form.password.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            {{ form.role.label(class="form-label") }}
+            {{ form.role(class="form-select") }}
+            {% for error in form.role.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            {{ form.is_active.label(class="form-label") }}
+            {{ form.is_active(class="form-select") }}
+            {% for error in form.is_active.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+
+        <hr>
+
+        <div class="mb-3">
+            {{ form.submit(class="btn btn-success") }} <!-- Botão verde para 'Adicionar' -->
+            <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Cancelar</a>
+        </div>
+
+    </form>
+{% endblock %}
+```
+#### Análise das Diferenças (em relação ao edit_user.html):
+***Campo de Senha***: A mudança mais óbvia e importante é a adição do bloco para renderizar o campo ***form.password***.<br>
+***Botão de Envio***: Mudei a classe do botão de btn-primary para btn-success ({{ form.submit(class="btn btn-success") }}).<br>
+É uma convenção de UX (User Experience) comum usar a cor verde para ações de "criação" ou "sucesso".<br>
+***Título e Texto***: O título \<h1>\{{ title }}\</h1> será "Adicionar Novo Usuário", conforme definimos na rota.
+### Passo 4: Ajustar o menu de navegação no arquivo: ***base.html***<br>
+Vamos modificar o nosso template principal, ***base.html***, para que o menu "Gerenciamento" tenha os links corretos para as páginas de "Editar" (que é a nossa lista de usuários) e "Adicionar".<br>
+Abra o arquivo ***app/templates/base.html***.<br>
+Encontre o trecho de código do menu dropdown "Gerenciamento".<br>
+Ele deve estar parecido com isto:
+***app/templates/base.html*** (Trecho para encontrar)
+```
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+        Gerenciamento
+    </a>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="{{ url_for('admin_users') }}">Usuários</a></li>
+    </ul>
+</li>
+```
+***Agora, vamos substituir o trecho de código acima, pelo novo código (menu):***
+```
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+        Gerenciamento
+    </a>
+    <ul class="dropdown-menu">
+        <!-- Link para a página de ADICIONAR um novo usuário -->
+        <li><a class="dropdown-item" href="{{ url_for('add_user') }}">Adicionar Usuário</a></li>
+        
+        <!-- Link para a página de LISTAR/EDITAR usuários existentes -->
+        <li><a class="dropdown-item" href="{{ url_for('admin_users') }}">Editar Usuários</a></li>
+    </ul>
+</li>
+```
+***Análise da Mudança:***
+* **href="{{ url_for('add_user') }}": ** O primeiro item do menu agora aponta para a nossa nova rota add_user, que exibe o formulário em branco.<br>
+* **href="{{ url_for('admin_users') }}": ** O segundo item aponta para a rota admin_users, que é a nossa página de listagem, de onde podemos iniciar a edição.<br>
+* Texto dos Links: Alteramos o texto para "Adicionar Usuário" e "Editar Usuários", que são ações muito mais explícitas e claras para o administrador.

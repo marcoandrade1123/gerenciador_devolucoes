@@ -22,12 +22,24 @@
                         </ul>
                     </li>
                     {% if current_user.role == 'admin' %}
-                    <li class="nav-item dropdown">
+                    <!-- <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             Gerenciamento
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('admin_users') }}">Usuários</a></li>
+                        </ul>
+                    </li> -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Gerenciamento
+                        </a>
+                        <ul class="dropdown-menu">
+                            <!-- Link para a página de ADICIONAR um novo usuário -->
+                            <li><a class="dropdown-item" href="{{ url_for('add_user') }}">Adicionar Usuário</a></li>
+                            
+                            <!-- Link para a página de LISTAR/EDITAR usuários existentes -->
+                            <li><a class="dropdown-item" href="{{ url_for('admin_users') }}">Editar Usuários</a></li>
                         </ul>
                     </li>
                     {% endif %}

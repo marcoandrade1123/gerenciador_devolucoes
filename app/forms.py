@@ -52,3 +52,37 @@ class EditUserForm(FlaskForm):
             user = User.query.filter_by(email=email.data).first()
             if user:
                 raise ValidationError('Este e-mail já está em uso por outro usuário.')
+
+# --- NOVO FORMULÁRIO DE ADIÇÃO DE USUÁRIO ---
+class AddUserForm(FlaskForm):
+    """
+    Formulário para um administrador adicionar um novo usuário ao sistema.
+    """
+    name = StringField('Nome Completo', validators=[DataRequired(), Length(min=2, max=100)])
+    email = StringField('E-mail', validators=[DataRequired(), Email()])
+    password = PasswordField('Senha', validators=[DataRequired(), Length(min=8)])
+    role = SelectField('Permissão (Role)', choices=[
+        ('admin', 'Administrador'),
+        ('sac1_sac2_add_edit', 'SAC 1 & 2 (Add/Edit)'),
+        ('sac1_edit', 'SAC 1 (Edit)'),
+        ('sac2_edit', 'SAC 2 (Edit)'),
+        ('fat_edit', 'Faturamento (Edit)'),
+        ('viewer', 'Visualizador')
+    ], validators=[DataRequired()])
+    is_active = SelectField('Status', choices=[
+        (True, 'Ativo'),
+        (False, 'Inativo')
+    ], coerce=bool, validators=[DataRequired()])
+    
+    submit = SubmitField('Adicionar Usuário')
+
+    def validate_email(self, email):
+        """
+        Valida se o e-mail fornecido já não está em uso.
+        """
+        user = User.query.filter_by(email=email.data).first()
+        if user:
+            raise ValidationError('Este e-mail já está cadastrado. Por favor, utilize outro.')
+
+
+
